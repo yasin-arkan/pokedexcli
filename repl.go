@@ -5,23 +5,71 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/yasin-arkan/pokedexcli/internal/pokeapi"
 )
+
+type config struct {
+	pokeapiClient    pokeapi.Client
+	nextLocationsURL *string
+	prevLocationsURL *string
+}
+
+func startRepl(cfg *config) {
+	reader := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("Pokedex > ")
+		reader.Scan()
+
+		words := cleanInput(reader.Text())
+		if len(words) == 0 {
+			continue
+		}
+
+		commandName := words[0]
+
+		command, exists := getCommands()[commandName]
+		if exists {
+			err := command.callback(cfg)
+			if err != nil {
+				fmt.Println(err)
+			}
+			continue
+		} else {
+			fmt.Println("Unknown command")
+			continue
+		}
+	}
+}
+
+func cleanInput(text string) []string {
+	output := strings.ToLower(text)
+	words := strings.Fields(output)
+	return words
+}
 
 type cliCommand struct {
 	name        string
 	description string
-	callback    func() error
+	callback    func(*config) error
 }
 
-var commands map[string]cliCommand
-
-func startRepl() {
-
-	commands = map[string]cliCommand{
+func getCommands() map[string]cliCommand {
+	return map[string]cliCommand{
 		"help": {
 			name:        "help",
 			description: "Displays a help message",
 			callback:    commandHelp,
+		},
+		"map": {
+			name:        "map",
+			description: "Get the next page of locations",
+			callback:    commandMapf,
+		},
+		"mapb": {
+			name:        "mapb",
+			description: "Get the previous page of locations",
+			callback:    commandMapb,
 		},
 		"exit": {
 			name:        "exit",
@@ -29,56 +77,4 @@ func startRepl() {
 			callback:    commandExit,
 		},
 	}
-
-	scanner := bufio.NewScanner(os.Stdin)
-
-	for {
-		fmt.Print(("Pokedex > "))
-		scanner.Scan()
-		input := scanner.Text()
-
-		cleaned := cleanInput(input)
-
-		for _, word := range cleaned {
-			command, ok := commands[word]
-
-			if ok {
-				err := command.callback()
-				if err != nil {
-					fmt.Println(err)
-					os.Exit(0)
-				}
-
-				continue
-			}
-
-			fmt.Println("Unknown command")
-
-		}
-
-	}
-}
-
-func cleanInput(text string) []string {
-
-	output := strings.ToLower(text)
-	words := strings.Fields(output)
-
-	return words
-}
-
-func commandExit() error {
-	fmt.Println("Closing the Pokedex... Goodbye!")
-	os.Exit(0)
-	return nil
-}
-
-func commandHelp() error {
-	fmt.Print("Welcome to the Pokedex!\nUsage:\n")
-
-	for _, c := range commands {
-		fmt.Printf("%s: %s\n", c.name, c.description)
-	}
-
-	return nil
 }
